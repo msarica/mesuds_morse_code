@@ -1,5 +1,5 @@
-import React, { useState, useCallback } from 'react';
-import { decodeFromMorse, isValidMorse } from '../utils/morseCode';
+import React, { useState, useCallback, useEffect } from 'react';
+import { decodeFromMorse } from '../utils/morseCode';
 import { useMorseAudio } from '../hooks/useMorseAudio';
 import './DecodeMode.css';
 
@@ -10,35 +10,49 @@ interface DecodeModeProps {
 export const DecodeMode: React.FC<DecodeModeProps> = ({ onBack }) => {
   const [inputMorse, setInputMorse] = useState('');
   const [decodedText, setDecodedText] = useState('');
-  const [error, setError] = useState('');
+  const [currentLetter, setCurrentLetter] = useState('');
   
   const audioControls = useMorseAudio(inputMorse);
 
-  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const morse = e.target.value;
-    setInputMorse(morse);
-    
-    if (morse.trim() === '') {
+  // Auto-decode when morse code changes
+  useEffect(() => {
+    if (inputMorse.trim() === '') {
       setDecodedText('');
-      setError('');
+      setCurrentLetter('');
       return;
     }
     
-    if (!isValidMorse(morse)) {
-      setError('Invalid morse code. Only dots (.), dashes (-), and spaces are allowed.');
-      setDecodedText('');
-      return;
-    }
-    
-    setError('');
     try {
-      const decoded = decodeFromMorse(morse);
+      // Use regular decode since we're manually adding spaces
+      const decoded = decodeFromMorse(inputMorse);
       setDecodedText(decoded);
+      
+      // Show the last decoded letter
+      if (decoded.length > 0) {
+        setCurrentLetter(decoded[decoded.length - 1]);
+      }
     } catch (err) {
-      setError('Failed to decode morse code. Please check your input.');
       setDecodedText('');
+      setCurrentLetter('');
     }
+  }, [inputMorse]);
+
+  const handleAddDot = useCallback(() => {
+    setInputMorse(prev => prev + '.');
   }, []);
+
+  const handleAddDash = useCallback(() => {
+    setInputMorse(prev => prev + '-');
+  }, []);
+
+  const handleAddSpace = useCallback(() => {
+    setInputMorse(prev => prev + ' ');
+  }, []);
+
+  const handleBackspace = useCallback(() => {
+    setInputMorse(prev => prev.slice(0, -1));
+  }, []);
+
 
   const handlePlayMorse = useCallback(() => {
     if (inputMorse.trim()) {
@@ -53,7 +67,6 @@ export const DecodeMode: React.FC<DecodeModeProps> = ({ onBack }) => {
   const handleCopyText = useCallback(async () => {
     try {
       await navigator.clipboard.writeText(decodedText);
-      // You could add a toast notification here
     } catch (error) {
       console.error('Failed to copy decoded text:', error);
     }
@@ -62,18 +75,8 @@ export const DecodeMode: React.FC<DecodeModeProps> = ({ onBack }) => {
   const handleClear = useCallback(() => {
     setInputMorse('');
     setDecodedText('');
-    setError('');
+    setCurrentLetter('');
   }, []);
-
-  const handlePasteMorse = useCallback(async () => {
-    try {
-      const text = await navigator.clipboard.readText();
-      setInputMorse(text);
-      handleInputChange({ target: { value: text } } as React.ChangeEvent<HTMLTextAreaElement>);
-    } catch (error) {
-      console.error('Failed to paste morse code:', error);
-    }
-  }, [handleInputChange]);
 
   return (
     <div className="decode-mode">
@@ -86,22 +89,49 @@ export const DecodeMode: React.FC<DecodeModeProps> = ({ onBack }) => {
 
       <div className="mode-content">
         <div className="input-section">
-          <label htmlFor="morse-input" className="input-label">
-            Enter morse code to decode:
+          <label className="input-label">
+            Click to build morse code:
           </label>
-          <textarea
-            id="morse-input"
-            className="morse-input"
-            value={inputMorse}
-            onChange={handleInputChange}
-            placeholder="Enter morse code using dots (.) and dashes (-)..."
-            rows={4}
-          />
-          {error && (
-            <div className="error-message">
-              ⚠️ {error}
+          <div className="morse-buttons">
+            <button 
+              className="morse-button dot-button"
+              onClick={handleAddDot}
+            >
+              <span className="morse-symbol">•</span>
+              <span className="morse-label">DOT</span>
+            </button>
+            <button 
+              className="morse-button dash-button"
+              onClick={handleAddDash}
+            >
+              <span className="morse-symbol">—</span>
+              <span className="morse-label">DASH</span>
+            </button>
+            <button 
+              className="morse-button space-button"
+              onClick={handleAddSpace}
+            >
+              <span className="morse-symbol">␣</span>
+              <span className="morse-label">SPACE</span>
+            </button>
+            <button 
+              className="morse-button backspace-button"
+              onClick={handleBackspace}
+            >
+              <span className="morse-symbol">⌫</span>
+              <span className="morse-label">DELETE</span>
+            </button>
+          </div>
+          <div className="morse-display">
+            <div className="morse-sequence">
+              {inputMorse || 'Click buttons to build morse code...'}
             </div>
-          )}
+            {currentLetter && (
+              <div className="current-letter">
+                Current letter: <strong>{currentLetter.toUpperCase()}</strong>
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="output-section">
@@ -121,12 +151,6 @@ export const DecodeMode: React.FC<DecodeModeProps> = ({ onBack }) => {
                 disabled={!decodedText.trim()}
               >
                 📋 Copy
-              </button>
-              <button 
-                className="action-button paste-button"
-                onClick={handlePasteMorse}
-              >
-                📥 Paste
               </button>
               <button 
                 className="action-button clear-button"

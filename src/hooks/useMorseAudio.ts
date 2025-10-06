@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useRef, useState, useEffect } from 'react';
 import { morseToTiming, DEFAULT_TIMING } from '../utils/morseCode';
 import type { MorseTiming } from '../utils/morseCode';
 
@@ -17,9 +17,9 @@ export function useMorseAudio(
     const [isPlaying, setIsPlaying] = useState(false);
     const [volume, setVolume] = useState(0.5);
     const audioContextRef = useRef<AudioContext | null>(null);
-    const oscillatorRef = useRef<OscillatorNode | null>(null);
-    const gainNodeRef = useRef<GainNode | null>(null);
+    const isPlayingRef = useRef(false);
     const timeoutRefs = useRef<number[]>([]);
+    const activeOscillatorsRef = useRef<OscillatorNode[]>([]);
 
     const createAudioContext = useCallback(() => {
         if (!audioContextRef.current) {
@@ -41,33 +41,61 @@ export function useMorseAudio(
         oscillator.connect(gainNode);
         gainNode.connect(audioContext.destination);
 
-        oscillatorRef.current = oscillator;
-        gainNodeRef.current = gainNode;
-
         return { oscillator, gainNode };
     }, [createAudioContext]);
 
     const playTone = useCallback((duration: number) => {
         return new Promise<void>((resolve) => {
-            const { oscillator, gainNode } = createOscillator();
-            const audioContext = audioContextRef.current!;
+            try {
+                const { oscillator, gainNode } = createOscillator();
+                const audioContext = audioContextRef.current!;
 
-            const now = audioContext.currentTime;
+                // Add to active oscillators for cleanup
+                activeOscillatorsRef.current.push(oscillator);
 
-            // Fade in
-            gainNode.gain.setValueAtTime(0, now);
-            gainNode.gain.linearRampToValueAtTime(volume, now + 0.01);
+                const now = audioContext.currentTime;
 
-            // Fade out
-            gainNode.gain.setValueAtTime(volume, now + duration - 0.01);
-            gainNode.gain.linearRampToValueAtTime(0, now + duration);
+                console.log(`Playing tone with volume: ${volume}`);
 
-            oscillator.start(now);
-            oscillator.stop(now + duration);
+                // Fade in
+                gainNode.gain.setValueAtTime(0, now);
+                gainNode.gain.linearRampToValueAtTime(volume, now + 0.01);
 
-            oscillator.onended = () => {
-                resolve();
-            };
+                // Fade out
+                gainNode.gain.setValueAtTime(volume, now + duration - 0.01);
+                gainNode.gain.linearRampToValueAtTime(0, now + duration);
+
+                oscillator.start(now);
+                oscillator.stop(now + duration);
+
+                // Fallback timeout in case onended doesn't fire
+                const fallbackTimeout = window.setTimeout(() => {
+                    try {
+                        oscillator.stop();
+                    } catch (e) {
+                        // Oscillator might already be stopped
+                    }
+                    // Remove from active oscillators
+                    const index = activeOscillatorsRef.current.indexOf(oscillator);
+                    if (index > -1) {
+                        activeOscillatorsRef.current.splice(index, 1);
+                    }
+                    resolve();
+                }, duration + 10); // 10ms buffer
+
+                oscillator.onended = () => {
+                    window.clearTimeout(fallbackTimeout);
+                    // Remove from active oscillators
+                    const index = activeOscillatorsRef.current.indexOf(oscillator);
+                    if (index > -1) {
+                        activeOscillatorsRef.current.splice(index, 1);
+                    }
+                    resolve();
+                };
+            } catch (error) {
+                console.error('Error in playTone:', error);
+                resolve(); // Resolve anyway to continue the sequence
+            }
         });
     }, [createOscillator, volume]);
 
@@ -81,13 +109,15 @@ export function useMorseAudio(
     }, []);
 
     const play = useCallback(async () => {
-        if (isPlaying || !morseCode.trim()) return;
+        if (isPlayingRef.current || !morseCode.trim()) return;
 
         setIsPlaying(true);
+        isPlayingRef.current = true;
 
         try {
             // Resume audio context if suspended (required for mobile browsers)
             const audioContext = createAudioContext();
+
             if (audioContext.state === 'suspended') {
                 await audioContext.resume();
             }
@@ -95,52 +125,61 @@ export function useMorseAudio(
             const timingSequence = morseToTiming(morseCode, timing);
 
             for (let i = 0; i < timingSequence.length; i++) {
-                if (!isPlaying) break; // Check if stopped
+                if (!isPlayingRef.current) break; // Check if stopped
 
                 const duration = timingSequence[i];
+                console.log(`Step ${i}: Playing ${i % 2 === 0 ? 'tone' : 'pause'} for ${duration}ms`);
 
                 if (i % 2 === 0) {
                     // Even indices are tones
                     await playTone(duration);
+                    console.log(`Step ${i}: Tone completed`);
                 } else {
                     // Odd indices are pauses
                     await playSilence(duration);
+                    console.log(`Step ${i}: Pause completed`);
                 }
             }
         } catch (error) {
             console.error('Error playing morse code:', error);
         } finally {
             setIsPlaying(false);
+            isPlayingRef.current = false;
         }
-    }, [isPlaying, morseCode, timing, createAudioContext, playTone, playSilence]);
+    }, [morseCode, timing, createAudioContext, playTone, playSilence]);
 
     const stop = useCallback(() => {
         setIsPlaying(false);
+        isPlayingRef.current = false;
 
-        // Stop oscillator
-        if (oscillatorRef.current) {
+        // Stop all active oscillators
+        activeOscillatorsRef.current.forEach(oscillator => {
             try {
-                oscillatorRef.current.stop();
+                oscillator.stop();
             } catch (error) {
                 // Oscillator might already be stopped
             }
-            oscillatorRef.current = null;
-        }
+        });
+        activeOscillatorsRef.current = [];
 
         // Clear all timeouts
         timeoutRefs.current.forEach(timeout => window.clearTimeout(timeout));
         timeoutRefs.current = [];
-
-        // Disconnect audio nodes
-        if (gainNodeRef.current) {
-            gainNodeRef.current.disconnect();
-            gainNodeRef.current = null;
-        }
     }, []);
 
     const setVolumeCallback = useCallback((newVolume: number) => {
-        setVolume(Math.max(0, Math.min(1, newVolume)));
+        const clampedVolume = Math.max(0, Math.min(1, newVolume));
+        console.log('Setting volume to:', clampedVolume);
+        setVolume(clampedVolume);
     }, []);
+
+    // Cleanup effect
+    useEffect(() => {
+        return () => {
+            // Stop all audio when component unmounts
+            stop();
+        };
+    }, [stop]);
 
     return {
         isPlaying,

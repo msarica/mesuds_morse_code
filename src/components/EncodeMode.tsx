@@ -43,6 +43,7 @@ export const EncodeMode: React.FC<EncodeModeProps> = ({ onBack }) => {
     setMorseCode('');
   }, []);
 
+
   return (
     <div className="encode-mode">
       <div className="mode-header">

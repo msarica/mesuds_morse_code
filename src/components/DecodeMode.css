@@ -50,33 +50,117 @@
   font-size: 1.1rem;
 }
 
-.morse-input {
-  width: 100%;
-  padding: 15px;
+.morse-buttons {
+  display: flex;
+  gap: 15px;
+  margin-bottom: 20px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.morse-button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px;
   border: none;
-  border-radius: 12px;
+  border-radius: 16px;
+  cursor: pointer;
   font-size: 1rem;
-  font-family: 'Courier New', monospace;
-  resize: vertical;
-  min-height: 100px;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  min-width: 100px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-  transition: box-shadow 0.3s ease;
+}
+
+.morse-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+}
+
+.morse-button:active {
+  transform: translateY(0);
+}
+
+.morse-symbol {
+  font-size: 2rem;
+  margin-bottom: 8px;
+  font-weight: bold;
+}
+
+.morse-label {
+  font-size: 0.8rem;
+  text-transform: uppercase;
   letter-spacing: 1px;
 }
 
-.morse-input:focus {
-  outline: none;
-  box-shadow: 0 6px 30px rgba(0, 0, 0, 0.15);
+.dot-button {
+  background: linear-gradient(135deg, #ff6b6b, #ee5a52);
+  color: white;
 }
 
-.error-message {
-  background: #f8d7da;
-  color: #721c24;
-  padding: 10px 15px;
+.dot-button:hover {
+  background: linear-gradient(135deg, #ff5252, #e53935);
+}
+
+.dash-button {
+  background: linear-gradient(135deg, #4ecdc4, #44a08d);
+  color: white;
+}
+
+.dash-button:hover {
+  background: linear-gradient(135deg, #26a69a, #00695c);
+}
+
+.space-button {
+  background: linear-gradient(135deg, #a8e6cf, #7fcdcd);
+  color: #333;
+}
+
+.space-button:hover {
+  background: linear-gradient(135deg, #81c784, #4caf50);
+  color: white;
+}
+
+.backspace-button {
+  background: linear-gradient(135deg, #ff9a9e, #fecfef);
+  color: #333;
+}
+
+.backspace-button:hover {
+  background: linear-gradient(135deg, #ff6b9d, #c44569);
+  color: white;
+}
+
+
+.morse-display {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  text-align: center;
+}
+
+.morse-sequence {
+  font-family: 'Courier New', monospace;
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #333;
+  letter-spacing: 2px;
+  min-height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  word-break: break-all;
+}
+
+.current-letter {
+  margin-top: 15px;
+  padding: 10px;
+  background: #e8f5e8;
   border-radius: 8px;
-  margin-top: 10px;
-  border: 1px solid #f5c6cb;
-  font-size: 0.9rem;
+  color: #2e7d32;
+  font-size: 1.1rem;
 }
 
 .output-section {
@@ -291,6 +375,28 @@
   
   .mode-header h2 {
     font-size: 1.5rem;
+  }
+  
+  .morse-buttons {
+    gap: 8px;
+  }
+  
+  .morse-button {
+    padding: 12px;
+    min-width: 70px;
+  }
+  
+  .morse-symbol {
+    font-size: 1.5rem;
+  }
+  
+  .morse-label {
+    font-size: 0.7rem;
+  }
+  
+  .morse-sequence {
+    font-size: 1rem;
+    letter-spacing: 1px;
   }
   
   .output-header {
